@@ -1,217 +1,98 @@
-# Turborepo Monorepo — TanStack Router + Elysia + Kysely
+# Quire
 
-A strictly-typed, linted, and formatted monorepo powered by **Bun workspaces** and
-**Turborepo**. A TanStack Router frontend and an Elysia + Kysely backend share a
-shadcn/ui component library and common TypeScript / ESLint configs.
+A collaborative document editor (Google Docs–inspired), built for the Ajaia assignment — write rich-text documents and share them with per-document roles, from a single-page app.
 
-```
-.
-├── apps
-│   ├── web/                # Frontend — React + Vite + TanStack Router (file-based)
-│   └── api/                # Backend — Elysia + Kysely (layered architecture)
-├── packages
-│   ├── ui/                 # @repo/ui — shadcn/ui component library (Tailwind v4)
-│   ├── tsconfig/           # @repo/tsconfig — shared TypeScript base configs
-│   └── eslint-config/      # @repo/eslint-config — shared flat ESLint config
-├── turbo.json              # Task pipeline (build / dev / lint / typecheck / test)
-└── package.json            # Bun workspaces + root scripts
-```
+## Live demo
 
-## Getting started
+**https://quire-1f21.onrender.com/**
 
-```bash
-bun install                       # install all workspace dependencies
-cp .env.example apps/api/.env     # set DATABASE_URL (+ optional LOG_LEVEL)
-cp .env.example apps/web/.env     # set VITE_API_URL
+Seeded accounts (all password `password123`):
 
-docker compose up -d              # start Postgres + Redis (see below)
-bun run db:migrate                # apply the schema to the database
+| Email               | Password      | Role                                |
+| ------------------- | ------------- | ----------------------------------- |
+| `alice@example.com` | `password123` | Admin — owns the two demo documents |
+| `bob@example.com`   | `password123` | Editor on Alice's "Product Roadmap" |
+| `carol@example.com` | `password123` | Viewer on Alice's "Product Roadmap" |
 
-bun run dev                       # boots web (http://localhost:5173) + api (http://localhost:3001)
-```
+To see the sharing flow, log in as **Bob** (editor) or **Carol** (viewer): Alice's "Product Roadmap" appears under **Shared with me** — editable for Bob, read-only for Carol.
 
-> Both apps validate their environment at boot with **t3-env** and fail fast on
-> invalid config. The repo ships working `apps/api/.env` and `apps/web/.env` for
-> local development.
+> The free Render tier spins down after ~15 min idle, so the first request may take 30–60s to wake.
 
-### Local services (Docker)
+## Features
 
-`docker-compose.yml` runs **Postgres** (`localhost:5432`, db `app`, user/pass
-`postgres`/`postgres` — matching `DATABASE_URL`) and **Redis** (`localhost:6379`),
-both with healthchecks and named volumes.
+- **Rich-text editing** (TipTap) — bold, italic, underline, H1/H2/H3, paragraph, bullet list, numbered list. Stored as TipTap JSON.
+- **File upload** — import `.md` or `.txt` files (max **2 MB**); parsed client-side into a new, editable document (Markdown → formatted, text → paragraphs).
+- **Sharing & access** — each document has an owner plus document-scoped roles (viewer / commenter / editor). The dashboard splits **My documents** vs **Shared with me**; only the owner can manage sharing or delete.
+- **Persistence** — documents and their formatting survive reload (debounced autosave); each content edit writes a version snapshot.
+- **Auth** — session-based register / login / logout (httpOnly cookie, argon2id hashing). Sessions are server-side rows — no signing secret to configure.
+
+## Tech stack
+
+Bun · Elysia · Kysely · PostgreSQL · React · TanStack Router (+ Query) · shadcn/ui · TipTap · Eden Treaty (end-to-end typed client). **Single-origin**: in production the API serves the built SPA; in dev Vite proxies `/api` to the API.
+
+## Local setup
+
+Prerequisites: **Bun ≥ 1.3.0** and **Docker** (for Postgres).
 
 ```bash
-docker compose up -d        # start (add --wait to block until healthy)
-docker compose ps           # status
-docker compose down         # stop (keep data); add -v to also wipe volumes
+git clone <repo-url> && cd ajaia-text-editor
+bun install
+cp .env.example apps/api/.env        # defaults match the bundled Postgres
+docker compose up -d postgres        # Postgres on :5432
+bun run db:migrate                   # create the schema
+bun run db:seed                      # seed demo accounts + documents
+bun run dev                          # API on :3001, web on :5173
 ```
 
-> Redis is included for convenience/future use — the API currently uses only
-> Postgres (Redis backed the rate limiter, which was removed).
+Open **http://localhost:5173**. Vite proxies `/api` to the API (:3001), so the browser stays same-origin.
 
-## Commands
+## Environment variables
 
-All commands run from the repo root and fan out across workspaces via Turborepo.
+Set in `apps/api/.env` (copied from `.env.example`).
 
-| Command              | Description                                                        |
-| -------------------- | ------------------------------------------------------------------ |
-| `bun run dev`        | Run `web` + `api` dev servers together                             |
-| `bun run build`      | Build every package (web → production bundle; api/ui → type-check) |
-| `bun run lint`       | ESLint (flat config) across all packages                           |
-| `bun run typecheck`  | `tsc --noEmit` across all packages                                 |
-| `bun run test`       | Run tests (`bun test`)                                             |
-| `bun run format`     | Format the repo with Prettier                                      |
-| `bun run db:migrate` | Run Kysely migrations (in `apps/api`)                              |
+| Variable                                                                 | Purpose                                                    | Required            |
+| ------------------------------------------------------------------------ | ---------------------------------------------------------- | ------------------- |
+| `DATABASE_URL`                                                           | PostgreSQL connection string                               | Yes                 |
+| `NODE_ENV`                                                               | `development` / `production` (prod sends `Secure` cookies) | No (dev)            |
+| `PORT`                                                                   | API port                                                   | No (3001)           |
+| `LOG_LEVEL`                                                              | `debug` / `info` / `warn` / `error`                        | No                  |
+| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | Cloudflare R2 — enables attachment storage                 | No                  |
+| `R2_PUBLIC_BASE_URL`                                                     | Public base URL for R2 files                               | No                  |
+| `RESEND_API_KEY`, `EMAIL_FROM`                                           | Resend — enables welcome / document-shared emails          | No                  |
+| `APP_URL`                                                                | Base URL used in email links                               | No (localhost:3001) |
 
-Scope a task to one app with Turborepo filters, e.g. `turbo run dev --filter=web`.
+## Testing
 
-## apps/web — TanStack Router
-
-- React 19 + Vite 8 + TypeScript, **file-based routing** via the official
-  `@tanstack/router-plugin/vite` (it must be registered **before** `@vitejs/plugin-react`).
-- Tailwind CSS v4 via `@tailwindcss/vite`; consumes the shared theme + components
-  from `@repo/ui` (the `@source` directive in `src/styles.css` lets Tailwind scan
-  the package's source).
-- Client env validated in `src/env.ts` with `@t3-oss/env-core`
-  (`clientPrefix: 'VITE_'`, `runtimeEnv: import.meta.env`).
-- The route tree (`src/routeTree.gen.ts`) is generated by the plugin and
-  **committed to git** (per TanStack's FAQ — it's part of the app's runtime).
-
-## apps/api — Elysia + Kysely (layered architecture)
-
-PostgreSQL via Kysely (`PostgresDialect` + `pg`). Request/response validation uses
-Elysia's `t`. The `src` tree enforces **one-way imports**:
-
-```
-routes → services → repositories → infra
-            models and plugins are shared sideways
-```
-
-```
-src/
-├── error-catalog.ts  # single matrix: error code → { HTTP status, message }
-├── container.ts      # composition root: wires db → repository → service
-├── infra/            # config + connections; never imports upward
-│   ├── env.ts        #   t3-env (server-only), validated at boot
-│   ├── db.ts         #   Kysely instance (pg Pool)
-│   └── types.ts      #   Kysely `Database` interface
-├── models/           # Elysia `t` DTOs + domain error classes (use the catalog)
-├── mappers/          # persistence (snake_case rows) ↔ domain (camelCase) mapping
-├── repositories/     # the ONLY layer that touches Kysely (db injected via ctor)
-│   ├── repository.interface.ts         #   generic Repository<Entity, Create, Update, Id>
-│   ├── course.repository.interface.ts  #   ICourseRepository (contract)
-│   └── course.repository.ts            #   CourseRepository (class)
-├── services/         # business logic — imports neither Elysia nor Kysely
-│   ├── course.service.interface.ts     #   ICourseService (contract)
-│   └── course.service.ts               #   CourseService (class)
-├── plugins/          # errors + logger (named singletons)
-├── routes/           # thin Elysia instances: validation + status codes
-├── app.ts            # composes plugins + routes; `export type App` (for Eden)
-├── index.ts          # listen + graceful shutdown (drain → close db)
-├── migrate.ts        # Kysely migration runner (`bun run db:migrate`)
-└── migrations/       # migration files
-```
-
-**Class-based + dependency injection.** Repositories and services are classes
-behind interfaces (each contract lives in its own `*.interface.ts` file):
-
-- `CourseRepository implements ICourseRepository` (a specialization of the
-  generic `Repository<…>`) takes its `Kysely<Database>` via the constructor — so
-  it's decoupled from the connection and mockable in tests.
-- `CourseService implements ICourseService` depends on the `ICourseRepository`
-  **interface** (constructor-injected), never the concrete class.
-- `container.ts` is the single composition root that constructs the concrete
-  graph (`db → repository → service`); routes import the wired `courseService`.
-- All row↔DTO translation lives in `mappers/` — neither the repository nor the
-  service hand-rolls field mapping.
-
-Each custom plugin is a named `new Elysia({ name })` so it deduplicates to a
-singleton. The example **`course`** feature is implemented end-to-end (model →
-mapper → repository → service → route) to demonstrate the pattern.
-
-Endpoints: `GET /` and `GET /health` (health), `GET /openapi` (Scalar UI),
-`GET|POST|PATCH|DELETE /courses` (full CRUD). `GET /courses` accepts optional
-`?published=` and `?title=` filters (see below).
-
-### Type-safe queries — `findWhere`
-
-The generic `Repository` exposes `findWhere(conditions)` for dynamic, ANDed
-column filters. Conditions are **framework-agnostic and type-safe** — keyed by
-entity field, each value is either a bare value (equality) or `{ op, value }`:
-
-```ts
-// service layer (no Kysely import):
-courseService.search({
-  published: true, // equality
-  title: { op: 'ilike', value: '%intro%' }, // operator
-})
-```
-
-Internally the repository translates this to Kysely's expression builder
-(`eb.and([eb(column, op, value), …])`), so the contract stays DB-agnostic while
-the implementation uses Kysely's full power. `GET /courses?published=true&title=intro`
-demonstrates it end-to-end (route → `service.search` → `repository.findWhere`).
-
-### Logging
-
-Logging uses **[Logixlysia](https://logixlysia.vercel.app/)** (configured in
-`plugins/logger.ts`). It's a named, scoped Elysia plugin applied once in
-`app.ts`. It prints a startup banner and logs every request (pretty + colorized
-in dev with timings and a slow-request indicator; verbosity via `LOG_LEVEL`).
-
-It also puts a `logger` (and the raw `pino`) on the store. To log custom
-messages from a handler, add `.use(logger)` once per route module (it's a
-deduped singleton — requests are still logged once) and use `store.logger`:
-
-```ts
-.post('/', async ({ body, store, request, status }) => {
-  const course = await courseService.create(body)
-  store.logger.info(request, 'course.created', { id: course.id })
-  return status(201, course)
-})
-```
-
-### Errors
-
-Every error — domain errors (`AppError` subclasses thrown by services) and
-Elysia built-ins (validation, parse, not-found) — is mapped to an HTTP response
-by the `errors` plugin through one file, **`src/error-catalog.ts`**. Change a
-status or message there and it applies everywhere. Responses share one shape:
-
-```jsonc
-{ "error": { "code": "ENTITY_NOT_FOUND", "message": "...", "details"?: ... } }
-```
-
-Internal error details are never leaked: a 5xx returns the generic catalog
-message to the client while Logixlysia logs the real error server-side.
-Logixlysia handles all request/error logging (level derived from status); the
-errors plugin only maps and shapes the response.
-
-### Database migrations
-
-Kysely migrations are driven by a small CLI (`apps/api/src/migrate.ts`). With
-`DATABASE_URL` pointing at a running Postgres:
+With Postgres running and migrated:
 
 ```bash
-bun run db:migrate              # apply all pending migrations (schema → DB)
+cd apps/api && bun test     # or, from the root: bun run test
 ```
 
-From `apps/api` (or `bun --filter api <script>`) you also get:
+The meaningful test is an integration test for the access-control layer (`apps/api/src/services/access/access.service.test.ts`) against a real Postgres. It asserts permissions for **owner / editor / viewer / non-shared** users and a **soft-deleted** document, plus a route-level **404** when a non-shared user requests a document.
 
-```bash
-bun run db:migrate:make <name>  # scaffold a new timestamped migration file
-bun run db:migrate:up           # apply the next pending migration
-bun run db:migrate:down         # roll back the last applied migration
+## Project structure
+
+```
+apps/
+  api/    Elysia API — auth, documents, sharing, access control, Kysely migrations, seed
+  web/    React SPA — TanStack Router routes, TipTap editor, shadcn UI, Eden client
+packages/
+  ui/             shared shadcn/ui components (@repo/ui)
+  eslint-config/  shared ESLint config
+  tsconfig/       shared TypeScript configs
+Dockerfile, render.yaml   single-origin production deploy (Render)
 ```
 
-`bun run db:migrate` is the command that migrates the schema to the database.
+## Scope & tradeoffs
 
-## packages/ui — shadcn/ui (`@repo/ui`)
+Intentionally cut to keep the assignment focused:
 
-Set up following shadcn's official **monorepo** guide: `components.json`,
-Tailwind v4, the `cn` util, and the full component set generated by the CLI. Add
-more components with:
+- **No real-time collaboration** — debounced autosave + version snapshots instead of live cursors / CRDT.
+- **No comment UI** — the `commenter` role exists in the access model but currently behaves like a viewer.
+- **Attachment storage built, upload UI deferred** — the R2 storage layer and `attachments` table exist, but the upload UI isn't wired.
+- **Version snapshots aren't coalesced** — every content save writes a new snapshot.
 
-```bash
-bunx shadcn@latest add <component> -c packages/ui
-```
+With another 2–4 hours I'd: wire the attachment upload UI to R2, coalesce rapid version snapshots into one, and add the comment UI for the `commenter` role.
+
+Full rationale and design decisions live in [ARCHITECTURE.md](./ARCHITECTURE.md).
