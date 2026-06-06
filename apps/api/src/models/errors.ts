@@ -31,3 +31,15 @@ export class BadRequestError extends AppError {
     super('BAD_REQUEST', message, details)
   }
 }
+
+export class UnauthorizedError extends AppError {
+  constructor(message?: string, details?: unknown) {
+    super('UNAUTHORIZED', message, details)
+  }
+}
+
+export class ForbiddenError extends AppError {
+  constructor(message?: string, details?: unknown) {
+    super('FORBIDDEN', message, details)
+  }
+}

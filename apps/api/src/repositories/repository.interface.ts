@@ -18,7 +18,7 @@ export type WhereConditions<Entity> = Partial<{
 
 /**
  * Generic CRUD repository contract. Feature repositories implement a
- * specialization of this (e.g. `ICourseRepository`), so services can depend on
+ * specialization of this (e.g. `IDocumentRepository`), so services can depend on
  * the abstraction rather than a concrete database implementation.
  */
 export interface Repository<Entity, CreateInput, UpdateInput, Id = string> {
