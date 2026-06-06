@@ -16,7 +16,7 @@ export type ErrorCode = keyof typeof ERROR_CATALOG
 
 /** Map Elysia's built-in error codes onto our application error codes. */
 export const ELYSIA_CODE_TO_APP_CODE: Record<string, ErrorCode> = {
-  VALIDATION: 'UNPROCESSABLE',
+  VALIDATION: 'BAD_REQUEST',
   NOT_FOUND: 'ROUTE_NOT_FOUND',
   PARSE: 'BAD_REQUEST',
   INVALID_COOKIE_SIGNATURE: 'BAD_REQUEST',

@@ -1,18 +1,20 @@
 import { app } from './app'
 import { closeDb } from './infra/db'
 import { env } from './infra/env'
+import { log } from './infra/logger'
+import { spa } from './plugins/spa'
 
-app.listen(env.PORT)
+app.use(spa).listen(env.PORT)
 
 let shuttingDown = false
 
 async function shutdown(signal: string): Promise<void> {
   if (shuttingDown) return
   shuttingDown = true
-  console.log(`\n${signal} received — draining and shutting down...`)
+  log.info({ signal }, 'received signal, draining and shutting down')
   await app.stop()
   await closeDb()
-  console.log('Shutdown complete.')
+  log.info('shutdown complete')
   process.exit(0)
 }
 
