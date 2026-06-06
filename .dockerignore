@@ -1,0 +1,16 @@
+# Installed/built fresh inside the image
+**/node_modules
+**/dist
+**/.turbo
+
+# VCS, local secrets, tooling
+.git
+.gitignore
+.env
+**/.env
+*.log
+.husky
+.vscode
+coverage
+Dockerfile
+.dockerignore
