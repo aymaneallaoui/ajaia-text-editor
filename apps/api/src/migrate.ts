@@ -4,13 +4,14 @@ import * as path from 'node:path'
 import { FileMigrationProvider, type MigrationResultSet, Migrator } from 'kysely/migration'
 
 import { closeDb, db } from './infra/db'
+import { log } from './infra/logger'
 
 const MIGRATIONS_DIR = path.join(import.meta.dir, 'migrations')
 
 const NEW_MIGRATION_TEMPLATE = `import type { Kysely } from 'kysely'
 
 export async function up(db: Kysely<any>): Promise<void> {
-  // e.g. await db.schema.alterTable('course').addColumn(...).execute()
+  // e.g. await db.schema.alterTable('documents').addColumn(...).execute()
 }
 
 export async function down(db: Kysely<any>): Promise<void> {
@@ -29,13 +30,13 @@ function report({ error, results }: MigrationResultSet): void {
   for (const result of results ?? []) {
     const tag = result.direction === 'Up' ? 'apply' : 'revert'
     if (result.status === 'Success') {
-      console.log(`✓ ${tag} "${result.migrationName}"`)
+      log.info(`✓ ${tag} "${result.migrationName}"`)
     } else if (result.status === 'Error') {
-      console.error(`✗ ${tag} "${result.migrationName}"`)
+      log.error(`✗ ${tag} "${result.migrationName}"`)
     }
   }
   if (error) {
-    console.error('Migration failed:', error)
+    log.error({ err: error }, 'Migration failed')
   }
 }
 
@@ -56,7 +57,7 @@ async function makeMigration(name: string): Promise<void> {
     .replace(/^_+|_+$/g, '')
   const file = path.join(MIGRATIONS_DIR, `${timestamp()}_${slug}.ts`)
   await fs.writeFile(file, NEW_MIGRATION_TEMPLATE, { flag: 'wx' })
-  console.log(`Created migration: ${path.relative(process.cwd(), file)}`)
+  log.info(`Created migration: ${path.relative(process.cwd(), file)}`)
 }
 
 async function run(): Promise<void> {
@@ -66,7 +67,7 @@ async function run(): Promise<void> {
     if (command === 'make') {
       const name = process.argv[3]
       if (!name) {
-        console.error('Usage: bun run db:migrate:make <name>')
+        log.error('Usage: bun run db:migrate:make <name>')
         process.exitCode = 1
         return
       }
@@ -88,7 +89,7 @@ async function run(): Promise<void> {
         result = await migrator.migrateDown()
         break
       default:
-        console.error(`Unknown command "${command}". Use: latest | up | down | make <name>`)
+        log.error(`Unknown command "${command}". Use: latest | up | down | make <name>`)
         process.exitCode = 1
         return
     }
